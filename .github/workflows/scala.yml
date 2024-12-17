@@ -1,76 +1,26 @@
-name: Build the app
-
-on: push
-
-concurrency:
-  # Only run once for latest commit per ref and cancel other (previous) runs.
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read # for checkout
-
+---
+name: Snyk
+on:
+  push:
+    branches: [main]
 jobs:
-  # build:
-
-  #   runs-on: ubuntu-latest
-
-  #   steps:
-  #     - name: checkout
-  #       uses: actions/checkout@v2
-
-  #     - name: Setup Scala
-  #       uses: japgolly/setup-everything-scala@v3.1
-  #       with:
-  #         java-version: 'adopt:1.11.0-11'
-  #         node-version: '16.7.0'
-
-  #     - name: Cache compiled code
-  #       uses: actions/cache@v3
-  #       with:
-  #         path: |
-  #           **/target/
-  #           /home/runner/.ivy2/local
-  #         key: compiled-code-cache-${{ hashFiles('**/build.sbt') }}
-  #         restore-keys: compiled-code-cache-
-
-  #     - name: Check code format
-  #       run: sbt scalafmtCheckAll
-
-  #     - name: Compile
-  #       run: CI=true sbt compile
-
-  #     - name: Run tests
-  #       run: CI=true sbt test
-
-  #     - name: Test summary
-  #       if: always() # Always run, even if previous steps failed
-  #       uses: test-summary/action@v2
-  #       with:
-  #         paths: "**/target/test-reports/*.xml"
-
-  #     - name: Prepare web build
-  #       run: sbt web/build
-
-  #     - name: Prepare server build
-  #       run: sbt server/dist
-
   security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # ratchet:actions/checkout@v3
+
+      - name: Set up Scala
+        uses: olafurpg/setup-scala@56b893ae09c48f21c16a9793a107c2723ccc123a # ratchet:olafurpg/setup-scala@v13
         with:
-          distribution: "temurin" # See 'Supported distributions' for available options
-          java-version: "11"
-      - uses: snyk/actions/setup@master
-      - name: Snyk test
-        run: snyk test --sarif-file-output=snyk.sarif --all-projects
-        continue-on-error: true
+          java-version: openjdk@1.17.0
+
+      - name: Setup Snyk
+        uses: snyk/actions/setup@cdb760004ba9ea4d525f2e043745dfe85bb9077e # ratchet:snyk/actions/setup@master
+
+      - name: Run Snyk to check for vulnerabilities
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-
-      - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: snyk.sarif
+          # SNYK_API: https://api.eu.snyk.io
+        run: |
+          snyk test
+        # snyk monitor --org=streaming --target-reference=ITV/${{ github.event.repository.name }} --project-name=${{ github.event.repository.name }}/build.sbt --file=${{ github.event.repository.name }}/build.sbt -d
